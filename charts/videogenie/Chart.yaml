@@ -1,0 +1,5 @@
+# charts/videogenie/Chart.yaml
+apiVersion: v2
+name: videogenie
+description: A Helm chart for deploying the VideoGenie application stack.
+version: 0.1.0
