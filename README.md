@@ -18,35 +18,83 @@ A single Git repo that spins up **every layer** of the platform described in the
 ```mermaid
 flowchart TD
     subgraph Client
-        U[User] -->|HTTPS| Edge[CIS]
-        Edge --> SPA[React SPA]
+        U[User Browser]
     end
+
+    subgraph Edge["IBM Cloud Internet Services CDN + WAF"]
+        CISCDN[CIS Edge POP]
+        SPA[React SPA static<br/>from COS]
+    end
+    U -- HTTPS --> CISCDN
+    CISCDN -- "HTML/CSS/JS" --> SPA
+
     subgraph Auth
-        SPA --> AppID[App ID]\n(OIDC)
+        AppID[IBM Cloud App ID]
     end
-    subgraph API
-        SPA -->|JWT| GW[IBM API Gateway] --> Istio[Istio Ingress]
+    SPA -- OAuth2 --> AppID
+    AppID -- JWT --> SPA
+
+    subgraph APIGateway["IBM API Gateway REST<br/>+ Istio Mesh"]
+        JWTAuth[JWT Plug‑in]
+        IstioEnvoy[Istio Ingress<br/>Envoy]
     end
-    subgraph Services
-        AvatarSvc[Knative avatar]
-        VoiceSvc[Watson TTS]
-        PromptSvc[watsonx LLM]
-        Orchestrate[watsonx Orchestrate]
-        Metrics[Cloud Functions]
-        Istio --> AvatarSvc & VoiceSvc & PromptSvc & Orchestrate & Metrics
+    SPA -- "Bearer JWT" --> JWTAuth --> IstioEnvoy
+
+    subgraph AI["Back‑end Services"]
+        AvatarSvc[Knative Service<br/>avatar‑svc]
+        VoiceSvc[Watson TTS/STT]
+        PromptSvc[watsonx.ai<br/>LLM prompt]
+        OrchestrateSvc[Code Engine Job<br/>assisted‑creation]
+        MetricsSvc[Cloud Functions<br/>metrics]
     end
+    IstioEnvoy --> AvatarSvc
+    IstioEnvoy --> VoiceSvc
+    IstioEnvoy --> PromptSvc
+    IstioEnvoy --> OrchestrateSvc
+    IstioEnvoy --> MetricsSvc
+
     subgraph Async
-        Orchestrate --> Kafka[Event Streams]
-        Kafka --> Argo[Argo Workflows] --> WS[WebSocket]
-        U -->|WS| WS
+        Kafka[Event Streams<br/>Kafka]
+        Argo[Argo Workflows]
+        WS[Istio Ingress<br/>WebSocket /notify]
     end
-    subgraph GPU
-        Argo --> Renderer[GPU Pod]
+    OrchestrateSvc --> Kafka
+    Kafka --> Argo --> WS
+    SPA -- "WS" --> WS
+
+    subgraph GPU["OpenShift GPU Pool V100"]
+        Renderer[Avatar Renderer Pod]
     end
-    Renderer --> COS[Cloud Object Storage]
-    COS --> Edge
-    Renderer --> Logs[Log Analysis]
-    Istio --> Tracing[Instana]
+    Argo --> Renderer
+
+    subgraph Storage
+        COS[Cloud Object Storage]
+    end
+    Renderer --> COS
+
+    subgraph Delivery
+        CISVid[CIS CDN<br/>/assets-public/]
+        SharePlayer[Embed Player]
+    end
+    COS --> CISVid
+    CISVid --> SPA
+    CISVid --> SharePlayer
+
+    subgraph Observability
+        Logs[IBM Log Analysis]
+        Instana[Instana APM]
+    end
+    AvatarSvc --> Logs
+    VoiceSvc --> Logs
+    Renderer --> Logs
+    IstioEnvoy --> Instana
+
+    classDef serverless fill:#fdf6e3,stroke:#268bd2
+    class AvatarSvc,MetricsSvc serverless
+    classDef watson fill:#e8f6ff,stroke:#2aa198
+    class VoiceSvc,PromptSvc,OrchestrateSvc watson
+    classDef gpu fill:#ffe8e8,stroke:#d33682
+    class Renderer gpu
 ```
 
 ---
