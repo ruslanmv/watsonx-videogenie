@@ -24,14 +24,14 @@ jobs:
       - name: ⬇️  Checkout repository
         uses: actions/checkout@v4
 
-      # 2 · Back‑end (avatar‑service)
+      # 2 · Back-end (avatar-service)
       - name: 🐍  Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
 
-      - name: 🛠️  Install back‑end dependencies
+      - name: 🛠️  Install back-end dependencies
         working-directory: services/avatar-service
         run: |
           python -m venv .venv
@@ -39,7 +39,7 @@ jobs:
           pip install --upgrade pip
           pip install fastapi uvicorn requests pydantic
 
-      - name: ▶️  Start avatar‑service
+      - name: ▶️  Start avatar-service
         working-directory: services/avatar-service
         run: |
           source .venv/bin/activate
@@ -50,12 +50,11 @@ jobs:
             sleep 1
           done
 
-      # 3 · Front‑end (React/Vite SPA)
-      - name: 🟢  Set up Node 18
+      # 3 · Front-end (React/Vite SPA)
+      - name: 🟢  Set up Node.js 18
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: "none"   # disabled until a lockfile is committed
 
       - name: 📦  Install & build SPA
         working-directory: frontend
