@@ -1,0 +1,33 @@
+# NOTE: This defines a Job template. In a real Code Engine scenario,
+# you would likely use a JobRun CRD that references a Job definition.
+# This example uses a standard Kubernetes Job for broader compatibility.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "videogenie.fullname" . }}-orchestrator
+  labels:
+    {{- include "videogenie.labels" . | nindent 4 }}
+spec:
+  completions: {{ .Values.orchestrator.completions }}
+  parallelism: {{ .Values.orchestrator.parallelism }}
+  template:
+    metadata:
+      labels:
+        {{- include "videogenie.selectorLabels" . | nindent 8 }}
+        component: orchestrator
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: orchestrator
+        image: "{{ .Values.global.image.registry }}/{{ .Values.orchestrator.image.name }}:{{ .Values.global.image.tag }}"
+        env:
+          - name: KAFKA_BROKERS
+            value: {{ .Values.global.kafka.brokers | quote }}
+          - name: KAFKA_TOPIC
+            value: {{ .Values.global.kafka.topic | quote }}
+          - name: KAFKA_SECRET_NAME
+            value: {{ include "videogenie.fullname" . }}-kafka-creds
+          - name: COS_BUCKET
+            value: {{ .Values.global.cos.bucket | quote }}
+          - name: AVATAR_SERVICE_URL
+            value: "http://{{ include "videogenie.fullname" . }}-avatar.{{ .Release.Namespace }}.svc.cluster.local"

@@ -1,1 +1,30 @@
-# manifests/keda-scaledobject.yaml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: renderer-scaledobject
+  namespace: videogenie
+spec:
+  scaleTargetRef:
+    name: renderer-deployment
+  pollingInterval: 30    # seconds
+  cooldownPeriod: 300    # seconds
+  minReplicaCount: 0
+  maxReplicaCount: 10
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: broker-0:9093,broker-1:9093
+        consumerGroup: renderer-scaler
+        topic: videoJob
+        lagThreshold: "5"
+      authenticationRef:
+        name: kafka-sasl-secret
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 30
+          policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 60

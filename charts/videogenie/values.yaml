@@ -1,1 +1,61 @@
-# charts/videogenie/values.yaml
+# Global values accessible by all templates
+global:
+  image:
+    registry: icr.io/videogenie
+    tag: latest
+  kafka:
+    brokers: "broker-0:9093,broker-1:9093"
+    topic: videoJob
+    # SASL credentials should be provided during installation
+    sasl:
+      username: ""
+      password: ""
+  cos:
+    bucket: "videos-prod"
+
+# Avatar Service (Knative)
+avatarService:
+  autoscale:
+    max: 5
+  resources:
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+# Prompt Service (Knative)
+promptService:
+  autoscale:
+    max: 3
+  resources:
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+# Orchestrator Job (Code Engine Job)
+orchestrator:
+  image:
+    name: orchestrate-job
+  completions: 1
+  parallelism: 1
+
+# GPU Renderer Deployment
+renderer:
+  image:
+    name: renderer-service
+  gpu:
+    # Supported types: v100, l40s
+    type: v100
+  # KEDA scaling
+  keda:
+    minReplicas: 0
+    maxReplicas: 2
+    pollingInterval: 30 # seconds
+    cooldownPeriod: 300 # seconds
+    lagThreshold: "5" # Number of messages in queue to scale up
+
+# WebSocket Service
+websocket:
+  image:
+    name: websocket-service
+  replicas: 1
+  port: 8080

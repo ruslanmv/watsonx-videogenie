@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: render-sensor
+  namespace: videogenie
+spec:
+  dependencies:
+    - name: kafka-video-event
+      eventSourceName: kafka-source
+      eventName: video-jobs
+  triggers:
+    - template:
+        name: start-render
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: vg-render-
+              spec:
+                workflowTemplateRef:
+                  name: render-workflow
+          parameters:
+            - src:
+                dependencyName: kafka-video-event
+                dataKey: body
+              dest: spec.arguments.parameters.0.value

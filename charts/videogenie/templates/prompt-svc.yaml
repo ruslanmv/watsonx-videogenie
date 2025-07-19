@@ -1,0 +1,27 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: {{ include "videogenie.fullname" . }}-prompt
+  labels:
+    {{- include "videogenie.labels" . | nindent 4 }}
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "{{ .Values.promptService.autoscale.max | default 3 }}"
+      labels:
+        {{- include "videogenie.selectorLabels" . | nindent 8 }}
+        component: prompt
+    spec:
+      containers:
+        - image: "{{ .Values.global.image.registry }}/prompt-service:{{ .Values.global.image.tag }}"
+          resources:
+            limits:
+              cpu: {{ .Values.promptService.resources.limits.cpu }}
+              memory: {{ .Values.promptService.resources.limits.memory }}
+          env:
+            - name: KAFKA_TOPIC
+              value: {{ .Values.global.kafka.topic | quote }}
+            - name: KAFKA_SECRET_NAME
+              value: {{ include "videogenie.fullname" . }}-kafka-creds

@@ -1,0 +1,13 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: kafka-source
+  namespace: videogenie
+spec:
+  kafka:
+    video-jobs:
+      url: kafka-bootstrap.vg-kafka.svc.cluster.local:9092
+      topic: videoJob
+      jsonBody: true
+      partitions: "0"
+      consumerGroup: argo-renderer

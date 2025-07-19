@@ -1,0 +1,27 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: {{ include "videogenie.fullname" . }}-avatar
+  labels:
+    {{- include "videogenie.labels" . | nindent 4 }}
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "{{ .Values.avatarService.autoscale.max | default 5 }}"
+      labels:
+        {{- include "videogenie.selectorLabels" . | nindent 8 }}
+        component: avatar
+    spec:
+      containers:
+        - image: "{{ .Values.global.image.registry }}/avatar-service:{{ .Values.global.image.tag }}"
+          resources:
+            limits:
+              cpu: {{ .Values.avatarService.resources.limits.cpu }}
+              memory: {{ .Values.avatarService.resources.limits.memory }}
+          env:
+            - name: KAFKA_BROKERS
+              value: {{ .Values.global.kafka.brokers | quote }}
+            - name: COS_BUCKET
+              value: {{ .Values.global.cos.bucket | quote }}

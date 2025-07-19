@@ -1,0 +1,20 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: helm-upgrade-from-source
+  namespace: cicd
+spec:
+  params:
+    - name: chart
+    - name: release
+    - name: namespace
+    - name: values-image-tag
+  workspaces:
+    - name: source
+  steps:
+    - name: helm-upgrade
+      image: alpine/helm:3.14.3
+      script: |
+        helm upgrade --install ${{params.release}} ${{workspaces.source.path}}/${{params.chart}} \
+          --namespace ${{params.namespace}} --create-namespace \
+          --set global.image.tag=${{params.values-image-tag}}

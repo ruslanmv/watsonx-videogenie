@@ -1,1 +1,27 @@
-# services/avatar-service/knative.yaml
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: avatar-service
+  namespace: videogenie
+  labels:
+    app: avatar-service
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "5"
+        autoscaling.knative.dev/target: "80"
+        autoscaling.knative.dev/metric: "concurrency"
+    spec:
+      containers:
+        - image: icr.io/videogenie/avatar-service:latest
+          resources:
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          env:
+            - name: MODEL_BUCKET
+              value: vg-models
+            - name: AWS_REGION
+              value: eu-de

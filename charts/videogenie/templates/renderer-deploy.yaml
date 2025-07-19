@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "videogenie.fullname" . }}-renderer
+  labels:
+    {{- include "videogenie.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.renderer.keda.minReplicas }}
+  selector:
+    matchLabels:
+      {{- include "videogenie.selectorLabels" . | nindent 6 }}
+      component: renderer
+  template:
+    metadata:
+      labels:
+        {{- include "videogenie.selectorLabels" . | nindent 8 }}
+        component: renderer
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.product: {{ .Values.renderer.gpu.type | quote }}
+      containers:
+        - name: renderer
+          image: "{{ .Values.global.image.registry }}/{{ .Values.renderer.image.name }}:{{ .Values.global.image.tag }}"
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+          env:
+            - name: KAFKA_SECRET_NAME
+              value: {{ include "videogenie.fullname" . }}-kafka-creds
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "videogenie.fullname" . }}-renderer-scaler
+  labels:
+    {{- include "videogenie.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: {{ include "videogenie.fullname" . }}-renderer
+  pollingInterval: {{ .Values.renderer.keda.pollingInterval }}
+  cooldownPeriod: {{ .Values.renderer.keda.cooldownPeriod }}
+  minReplicaCount: {{ .Values.renderer.keda.minReplicas }}
+  maxReplicaCount: {{ .Values.renderer.keda.maxReplicas }}
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: {{ .Values.global.kafka.brokers }}
+        consumerGroup: {{ include "videogenie.fullname" . }}-renderer-group
+        topic: {{ .Values.global.kafka.topic }}
+        lagThreshold: {{ .Values.renderer.keda.lagThreshold | quote }}
+        sasl: "plain" # Assuming SASL/PLAIN
+        authenticationMode: sasl_plaintext
+      authenticationRef:
+        name: {{ include "videogenie.fullname" . }}-keda-kafka-trigger

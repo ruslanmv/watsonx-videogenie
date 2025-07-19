@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "videogenie.fullname" . }}-websocket
+  labels:
+    {{- include "videogenie.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.websocket.replicas }}
+  selector:
+    matchLabels:
+      {{- include "videogenie.selectorLabels" . | nindent 6 }}
+      component: websocket
+  template:
+    metadata:
+      labels:
+        {{- include "videogenie.selectorLabels" . | nindent 8 }}
+        component: websocket
+    spec:
+      containers:
+      - name: websocket
+        image: "{{ .Values.global.image.registry }}/{{ .Values.websocket.image.name }}:{{ .Values.global.image.tag }}"
+        ports:
+        - containerPort: {{ .Values.websocket.port }}
+          name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "videogenie.fullname" . }}-websocket
+  labels:
+    {{- include "videogenie.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "videogenie.selectorLabels" . | nindent 4 }}
+    component: websocket
+  ports:
+  - port: 80
+    targetPort: {{ .Values.websocket.port }}
+    name: http
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "videogenie.fullname" . }}-websocket-vs
+  labels:
+    {{- include "videogenie.labels" . | nindent 4 }}
+spec:
+  hosts:
+  - "*" # Or a specific host, e.g., "videogenie.example.com"
+  gateways:
+  - istio-system/public-gateway # Assumes a public gateway
+  http:
+  - match:
+    - uri:
+        prefix: /ws
+    route:
+    - destination:
+        host: {{ include "videogenie.fullname" . }}-websocket.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 80
+    # WebSocket upgrade is handled by Istio's default behavior for HTTP/1.1

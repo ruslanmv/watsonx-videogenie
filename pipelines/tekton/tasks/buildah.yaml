@@ -1,0 +1,27 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: buildah
+  namespace: cicd
+spec:
+  params:
+    - name: IMAGE
+      type: string
+    - name: CONTEXT
+      type: string
+    - name: PUSH
+      type: string
+      default: "false"
+  workspaces:
+    - name: source
+  steps:
+    - name: build
+      image: quay.io/buildah/stable:v1.35
+      script: |
+        buildah bud --layers -f ${{params.CONTEXT}}/Dockerfile \
+          -t ${{params.IMAGE}} ${{params.CONTEXT}}
+        if [[ "${{params.PUSH}}" == "true" ]]; then
+          buildah push ${{params.IMAGE}}
+        fi
+      securityContext:
+        privileged: true

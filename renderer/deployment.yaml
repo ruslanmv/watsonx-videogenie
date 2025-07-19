@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: renderer-deployment
+  namespace: videogenie # Deploying into the project's namespace
+  labels:
+    app: renderer
+spec:
+  replicas: 0 # KEDA will manage the replica count, scaling from 0.
+  selector:
+    matchLabels:
+      app: renderer
+  template:
+    metadata:
+      labels:
+        app: renderer
+    spec:
+      # This nodeSelector ensures the pod is scheduled only on nodes that
+      # have been specifically labeled as GPU nodes.
+      nodeSelector:
+        role: gpu
+      # Tolerations are needed if the GPU nodes have been tainted.
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: renderer
+        image: icr.io/videogenie/renderer:latest # The image built from the Dockerfile
+        # This is the key part for OpenShift: requesting a GPU resource.
+        # The NVIDIA GPU Operator on the cluster makes this resource type available.
+        resources:
+          limits:
+            nvidia.com/gpu: "1" # Request exactly one GPU
+        env:
+        # Environment variables are populated from Kubernetes Secrets and ConfigMaps.
+        # This decouples the container image from the configuration.
+        - name: JOB_PAYLOAD
+          valueFrom:
+            configMapKeyRef:
+              name: job-payload-cm # Assumes a ConfigMap holds the job data
+              key: payload.json
+        - name: COS_BUCKET
+          value: "vg-videos-prod"
+        - name: COS_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cos-credentials # Secret containing COS keys
+              key: access_key_id
+        - name: COS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cos-credentials
+              key: secret_access_key

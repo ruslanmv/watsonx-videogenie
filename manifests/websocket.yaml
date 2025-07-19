@@ -1,1 +1,59 @@
-# manifests/websocket.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: websocket-deployment
+  namespace: videogenie
+  labels:
+    app: websocket
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: websocket
+  template:
+    metadata:
+      labels:
+        app: websocket
+    spec:
+      containers:
+      - name: websocket-server
+        image: icr.io/videogenie/websocket-service:latest
+        ports:
+        - containerPort: 8080
+          name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: websocket-service
+  namespace: videogenie
+spec:
+  selector:
+    app: websocket
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: websocket-vs
+  namespace: videogenie
+spec:
+  hosts:
+  - "videogenie.example.com" # Replace with your actual domain
+  gateways:
+  - istio-system/public-gateway # Assumes a gateway named 'public-gateway' in 'istio-system'
+  http:
+  - match:
+    - uri:
+        prefix: /ws
+    route:
+    - destination:
+        host: websocket-service.videogenie.svc.cluster.local
+        port:
+          number: 80
+    # The websocketUpgrade setting is implicitly true in modern Istio versions
+    # for standard HTTP routes, but can be explicit if needed.
+    # websocketUpgrade: true

@@ -1,5 +1,11 @@
-# charts/videogenie/Chart.yaml
 apiVersion: v2
 name: videogenie
-description: A Helm chart for deploying the VideoGenie application stack.
 version: 0.1.0
+appVersion: "0.1.0"
+description: All-in-one chart for VideoGenie IBM Cloud edition
+icon: https://raw.githubusercontent.com/videogenie/art/main/icon.png
+keywords:
+  - watsonx
+  - video
+  - avatar
+  - gpu

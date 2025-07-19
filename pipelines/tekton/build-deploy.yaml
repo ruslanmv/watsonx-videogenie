@@ -1,0 +1,63 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: build-and-deploy
+  namespace: cicd
+spec:
+  params:
+    - name: image-tag
+      type: string
+  workspaces:
+    - name: source
+  tasks:
+    - name: git-clone
+      taskRef:
+        name: git-clone
+        kind: ClusterTask
+      params:
+        - name: url
+          value: https://github.com/videogenie/watsonx-videogenie.git
+        - name: revision
+          value: $(params.image-tag)
+      workspaces:
+        - name: output
+          workspace: source
+
+    - name: build-images
+      runAfter: [git-clone]
+      taskRef: { name: buildah }
+      params:
+        - name: IMAGE
+          value: icr.io/videogenie/avatar-service:$(params.image-tag)
+        - name: CONTEXT
+          value: $(workspaces.source.path)/services/avatar-service
+      workspaces:
+        - name: source
+
+    - name: push-images
+      runAfter: [build-images]
+      taskRef: { name: buildah }
+      params:
+        - name: IMAGE
+          value: icr.io/videogenie/avatar-service:$(params.image-tag)
+        - name: CONTEXT
+          value: $(workspaces.source.path)/services/avatar-service
+        - name: PUSH
+          value: "true"
+      workspaces:
+        - name: source
+
+    - name: helm-upgrade
+      runAfter: [push-images]
+      taskRef: { name: helm-upgrade-from-source }
+      params:
+        - name: chart
+          value: charts/videogenie
+        - name: release
+          value: videogenie
+        - name: namespace
+          value: videogenie
+        - name: values-image-tag
+          value: $(params.image-tag)
+      workspaces:
+        - name: source

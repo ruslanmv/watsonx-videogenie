@@ -1,1 +1,21 @@
-# services/prompt-service/knative.yaml
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: prompt-service
+  namespace: videogenie
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "10"
+        autoscaling.knative.dev/target: "100"
+    spec:
+      containers:
+        - image: icr.io/videogenie/prompt-service:latest
+          env:
+            - name: WATSONX_APIKEY
+              valueFrom:
+                secretKeyRef: { name: watsonx-secret, key: apikey }
+            - name: PROJECT_ID
+              value: "<project-id>"

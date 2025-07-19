@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: render-workflow
+  namespace: videogenie
+spec:
+  entrypoint: render-pipeline
+  templates:
+    - name: render-pipeline
+      steps:
+        - - name: tts
+            template: tts-step
+        - - name: chunk
+            template: chunk-step
+        - - name: render
+            template: gpu-render
+        - - name: notify
+            template: notify-step
+
+    - name: tts-step
+      container:
+        image: icr.io/videogenie/voice-service:latest
+        command: ["python","tts.py"]
+        env:
+          - name: INPUT_JSON
+            value: "{{workflow.parameters.input}}"
+
+    - name: chunk-step
+      container:
+        image: icr.io/videogenie/prompt-service:latest
+        command: ["python","chunk.py"]
+
+    - name: gpu-render
+      container:
+        image: icr.io/videogenie/renderer:latest
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+
+    - name: notify-step
+      container:
+        image: icr.io/videogenie/notify:latest
+        env:
+          - name: WS_ENDPOINT
+            value: "wss://api.prd.videogenie.cloud/notify"

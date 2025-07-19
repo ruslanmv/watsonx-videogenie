@@ -1,1 +1,24 @@
-# services/orchestrate-service/codeengine.yaml
+apiVersion: codeengine.cloud.ibm.com/v1beta1
+kind: Job
+metadata:
+  name: orchestrate-job
+  namespace: videogenie
+spec:
+  runPolicy:
+    maxExecutionTime: 300   # seconds
+    retryLimit: 2
+  template:
+    containers:
+      - image: icr.io/videogenie/orchestrate-service:latest
+        env:
+          - name: KAFKA_BROKERS
+            value: "broker-0:9093,broker-1:9093"
+          - name: KAFKA_TOPIC
+            value: videoJob
+          - name: ORCH_APIKEY
+            valueFrom:
+              secretKeyRef:
+                name: orch-creds
+                key: apikey
+  # Uncomment to enable a heartbeat every 5 minutes
+  # schedule: "*/5 * * * *"
