@@ -250,3 +250,5 @@ ibmcloud cis instance-delete $(cis zone ls | awk '/videogenie/{print $1}') -f
 ## License
 
 Apache 2.0 — build, remix, share.  If you create something cool, PRs are welcome!
+
+Enjoy building! PRs & issues welcome. For support jump into #videogenie on the IBM Cloud community Slack.
