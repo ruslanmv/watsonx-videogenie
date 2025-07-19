@@ -5,7 +5,7 @@
 [![Built for IBM Cloud](https://img.shields.io/badge/IBM%20Cloud‑Ready-blue)]()
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)]()
 [![License Apache‑2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)]()
-[![CI Status](https://github.com/videogenie/videogenie-ibmcloud/actions/workflows/local-smoke.yml/badge.svg)](https://github.com/ruslanmv/videogenie-ibmcloud/actions/workflows/local-smoke.yml)
+[![CI Status](https://github.com/ruslanmv/watsonx-videogenie/actions/workflows/local-smoke.yml/badge.svg)](https://github.com/ruslanmv/watsonx-videogenie/actions/workflows/local-smoke.yml)
 
 A **proof‑of‑concept** that converts any script into a narrated avatar video using IBM Cloud buckets, serverless & GPU nodes.
 
