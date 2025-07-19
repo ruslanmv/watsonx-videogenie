@@ -1,0 +1,94 @@
+# .github/workflows/local-smoke.yml
+name: Local Front‑end & Back‑end Smoke Test
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+
+    env:                       # (env‑block reserved for future secrets)
+      BACKEND_PORT: 8000
+      FRONTEND_PORT: 3000
+
+    steps:
+      # ───────────────────────────────────────────────
+      - name: ⬇️  Checkout repository
+        uses: actions/checkout@v4
+
+      # ───────────────────────────────────────────────
+      # 1 · Back‑end (avatar‑service)
+      - name: 🐍  Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: 🛠️  Install back‑end deps
+        working-directory: services/avatar-service
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install fastapi uvicorn requests pydantic
+
+      - name: ▶️  Start avatar‑service
+        working-directory: services/avatar-service
+        run: |
+          source .venv/bin/activate
+          uvicorn app.main:app --host 0.0.0.0 --port $BACKEND_PORT &
+          # wait until endpoint responds
+          for i in {1..20}; do
+            curl -s http://localhost:$BACKEND_PORT/avatars && break
+            sleep 1
+          done
+
+      # ───────────────────────────────────────────────
+      # 2 · Front‑end (React/Vite SPA)
+      - name: 🟢  Set up Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: "npm"
+
+      - name: 📦  Install & build SPA
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+          npx --yes serve -s dist -l $FRONTEND_PORT &
+          for i in {1..20}; do
+            curl -s http://localhost:$FRONTEND_PORT/ && break
+            sleep 1
+          done
+
+      # ───────────────────────────────────────────────
+      # 3 · Smoke tests
+      - name: 🔍  GET /avatars
+        run: curl -sf http://localhost:$BACKEND_PORT/avatars
+
+      - name: 🔍  GET /
+        run: curl -sf http://localhost:$FRONTEND_PORT/
+
+      # ───────────────────────────────────────────────
+      # 4 · make check  (optional static checks / pytest)
+      # If your repo has a Makefile target named “check” the next step will run it.
+      - name: 🧪  make check
+        if: hashFiles('Makefile') != ''
+        run: make check || echo "ℹ️ No check target — skipping."
+
+      # ───────────────────────────────────────────────
+      # 5 · Graceful clean‑up
+      - name: 🧹  Kill background servers
+        if: always()
+        run: |
+          pkill -f "uvicorn" || true
+          pkill -f "serve"   || true
