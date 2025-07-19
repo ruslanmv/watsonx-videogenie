@@ -347,82 +347,54 @@ The final architecture is a cloud-native, event-driven system designed for secur
 ```mermaid
 flowchart TD
   subgraph Client
-    U[User Browser]
+    U[User]
   end
-
-  subgraph Edge [IBM Cloud Internet Services]
-    CDN[CIS POP / WAF] --> SPA[React SPA from COS]
+  subgraph Edge[IBM CIS]
+    CDN[CIS POP] --> SPA[React SPA]
   end
-
+  U --> CDN
   subgraph Auth
-    AppID[IBM Cloud App ID]
+    AppID[App ID]
   end
-
-  subgraph Gateway [API Gateway + Istio]
-    JWT[JWT Filter] --> Mesh[Istio Ingress]
+  SPA --> AppID
+  subgraph Gateway[API + Istio]
+    JWT[JWT Filter] --> Mesh[Istio Envoy]
   end
-
-  subgraph Services [OpenShift Cluster]
-    Avatar[avatar-svc]
-    Voice[voice-svc]
-    Prompt[prompt-svc]
-    Orch[orchestrate-svc]
-    Metrics[metrics-action]
+  SPA --> JWT
+  subgraph Services
+    Avatar[avatar‑svc]
+    Voice[voice‑svc]
+    Prompt[prompt‑svc]
+    Orch[orchestrate‑svc]
+    Metrics[metrics‑action]
   end
-
-  subgraph Async Pipeline
-    ES[Event Streams (Kafka)] --> WF[Argo Workflows]
-    WS[WebSocket Service]
+  Mesh --> Avatar & Voice & Prompt & Orch & Metrics
+  subgraph Async
+    ES[Kafka] --> WF[Argo WF]
+    WS[WebSocket]
   end
-
-  subgraph GPU Fleet [Auto-Scaling]
-    Rend[GPU Renderer Pod]
+  Orch --> ES
+  WF --> WS
+  SPA --> WS
+  subgraph GPU
+    Rend[GPU renderer]
   end
-
+  WF --> Rend
   subgraph Storage
-    COS[(Cloud Object Storage)]
+    COS[(COS)]
   end
-
+  Rend --> COS
   subgraph Delivery
-    VID[CIS Video Cache] --> Player[Embeddable Player]
+    VID[CIS Video Cache] --> Player[Embed]
   end
-
+  COS --> VID
   subgraph Observability
-    Logs[IBM Log Analysis]
-    Inst[Instana APM]
+    Logs[Log Analysis]
+    Inst[Instana]
   end
-
-  U -- HTTPS --> CDN
-  CDN --> SPA
-
-  SPA -- OAuth Flow --> AppID
-  AppID -- JWT Token --> SPA
-
-  SPA -- /api/* (JWT) --> JWT
-  JWT --> Mesh
-
-  SPA -- /ws/* --> WS
-
-  Mesh --> Avatar
-  Mesh --> Voice
-  Mesh --> Prompt
-  Mesh --> Orch
-  Mesh --> Metrics
-
-  Orch -- Video Job --> ES
-  ES -- Event --> WF
-  WF -- Spawns Pod --> Rend
-  Rend -- Renders Video --> COS
-  Rend -- Status Update --> ES
-  ES -- Status --> WS
-  WS -- Progress --> U
-
-  COS -- Private URL --> VID
-  VID -- Cached Video --> Player
-
-  Services -- Logs --> Logs
-  Rend -- Logs & Metrics --> Logs
-  Mesh -- Traces --> Inst
+  Avatar --> Logs
+  Rend --> Logs
+  Mesh --> Inst
 ```
 
 ### Security and Compliance Wrap-up
