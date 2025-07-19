@@ -102,7 +102,6 @@ flowchart TD
 
 ## ⚡ Quick start (local ≤ 10 min)
 
-Below is the drop‑in snippet you can paste under **“⚡ Quick start (local ≤ 10 min)”** in `README.md`.
 It mirrors the streamlined workflow we refined earlier and runs **entirely on your laptop** with Kind.
 
 ```bash
