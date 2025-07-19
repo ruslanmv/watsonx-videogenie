@@ -1,32 +1,39 @@
 <!doctype html>
 <html lang="en" class="h-full scroll-smooth">
   <head>
-    <!-- ────────── Meta & SEO ────────── -->
+    <!-- Core meta -->
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <!-- Icons / PWA -->
+    <link rel="icon" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- SEO / social -->
+    <title>VideoGenie · AI Avatar Video Creator</title>
     <meta
       name="description"
-      content="VideoGenie turns plain text into AI‑generated avatar videos. Built with IBM Cloud, watsonx .ai and OpenShift GPU compute."
+      content="Turn plain text into AI‑generated avatar videos with IBM Cloud & watsonx."
     />
-    <meta name="theme-color" content="#0f62fe" />
-    <link rel="icon" href="/favicon.svg" />
-
-    <!-- Social preview -->
     <meta property="og:title" content="VideoGenie — AI Avatar Video Creator" />
     <meta
       property="og:description"
       content="Instantly create narrated videos from any script. Powered by IBM Cloud."
     />
     <meta property="og:image" content="/social-preview.png" />
-    <meta property="og:type" content="website" />
 
-    <title>VideoGenie · AI Avatar Video Creator</title>
-
-    <!-- Tailwind “base components utilities” will be injected at build time -->
+    <!-- Optional Hotjar snippet (controlled via Vite env var) -->
+    <script>
+      if (import.meta.env.VITE_ENABLE_ANALYTICS === "true") {
+        const s = document.createElement("script");
+        s.src = "/vendors/hotjar.js";
+        document.head.appendChild(s);
+      }
+    </script>
   </head>
 
   <body class="min-h-full bg-slate-50 text-slate-800 antialiased">
-    <!-- Loading shell → swapped out by React within ~50 ms in dev / ~10 ms in prod -->
+    <!-- Loading shell – swapped out by React almost immediately -->
     <div
       id="root"
       class="grid h-screen place-items-center text-center px-6"
@@ -54,7 +61,7 @@
       </div>
     </div>
 
-    <!-- React / Vite entrypoint -->
+    <!-- Vite / React entrypoint -->
     <script type="module" src="/src/main.tsx"></script>
 
     <noscript>
