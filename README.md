@@ -102,46 +102,45 @@ flowchart TD
 
 ## ⚡ Quick start (local ≤ 10 min)
 
+Below is the drop‑in snippet you can paste under **“⚡ Quick start (local ≤ 10 min)”** in `README.md`.
+It mirrors the streamlined workflow we refined earlier and runs **entirely on your laptop** with Kind.
+
 ```bash
-# 1 – Clone
- git clone https://github.com/videogenie/watsonx-videogenie.git
- cd watsonx-videogenie
+# 0 · Prereqs: Docker + Kind + Make + Node 18 + Python 3.11 on your host
+# ────────────────────────────────────────────────────────────────────
 
-# 2 – Provision base IBM Cloud infra (CIS, COS, Event Streams, App ID, Secrets Mgr)
- cd infra/terraform && terraform init && \
-   terraform apply -auto-approve -var domain="videogenie.cloud"
- cd ../..
+# 1 · Clone the repo
+git clone https://github.com/videogenie/watsonx-videogenie.git
+cd watsonx-videogenie
 
-# 3 – Build + push OCI images
- make container-build REG="icr.io/videogenie" TAG=$(git rev-parse --short HEAD)
+# 2 · Build local OCI images
+make container-build TAG=$(git rev-parse --short HEAD)
 
-# 4 – Local toolchain for scripts
- make setup        # creates Python venv + tooling
+# 3 · Create Python toolchain (optional helper scripts)
+make setup
+# source .venv/bin/activate   # if you want to run Python utilities
 
-# 5 – Credentials
- cp .env.example .env   # edit with App ID, Watson x & COS creds
+# 4 · Spin a Kind cluster named “videogenie”
+make kind-up                 #  ➜  k8s + Istio + Knative + Argo + KEDA
 
-# 6 – Install cluster add‑ons (Istio, Argo, KEDA) on your OpenShift cluster
- make install-istio install-argo install-keda
+# 5 · Deploy the stack into Kind
+make install-istio install-argo install-keda
+helm upgrade --install videogenie charts/videogenie \
+  --namespace videogenie --create-namespace \
+  --set global.image.tag=$(git rev-parse --short HEAD)
 
-# 7 – Deploy umbrella Helm chart
- helm upgrade --install videogenie charts/videogenie \
-   --namespace videogenie --create-namespace \
-   --set global.image.tag=$(git rev-parse --short HEAD)
-
-# 8 – (Optional) local KIND smoke cluster (CPU‑only renderer)
- make kind-up && cd frontend && npm ci && npm start
-
-# 9: Run the Frontend Development Server
-# With the backend services running in KIND, you can now start the frontend.
+# 6 · Run the front‑end dev server (auto‑reload)
 cd frontend
 npm ci
-npm start
+npm start                     # ⇢ http://localhost:5173
 
-echo "✅ Local development environment is up and running!"
-echo "🚀 Frontend should be available at http://localhost:5173"
-
+echo
+echo "✅  Local VideoGenie is ready."
+echo "🖼  Test avatar list:   curl -s http://localhost:8000/avatars"
+echo "🌐  SPA dev server:    http://localhost:5173"
 ```
+
+The commands above **do not touch IBM Cloud**—they just prove the stack works end‑to‑end on your machine.
 
 For a **production IBM Cloud** deployment follow the step‑by‑step sections below.
 
