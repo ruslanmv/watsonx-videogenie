@@ -109,7 +109,7 @@ It mirrors the streamlined workflow we refined earlier and runs **entirely on yo
 # ────────────────────────────────────────────────────────────────────
 
 # 1 · Clone the repo
-git clone https://github.com/videogenie/watsonx-videogenie.git
+git clone https://github.com/ruslanmv/watsonx-videogenie.git
 cd watsonx-videogenie
 
 # 2 · Build local OCI images
