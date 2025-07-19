@@ -1,150 +1,207 @@
-# Building **VideoGenie** on IBM Cloud – from Zero to Global Text‑to‑Avatar Video SaaS
-
-## Introduction
-
-This guide is your single source of truth for standing up VideoGenie — an end‑to‑end, production‑ready text‑to‑avatar video generator — using 100 % IBM Cloud native services plus CNCF tooling on OpenShift. Follow it top‑to‑bottom and you will:
-
-* Serve a React SPA worldwide via **IBM Cloud Internet Services (CIS)**.
-* Authenticate users with **IBM Cloud App ID** and JWT.
-* Front all traffic through **IBM API Gateway**, then secure east‑west calls with an **Istio** mesh.
-* Run stateless micro‑services on **Knative**; heavy GPU rendering on V100/L40S worker pools.
-* Orchestrate long jobs with **Event Streams (Kafka)** + **Argo Workflows**.
-* Store & deliver videos from **Cloud Object Storage** cached by CIS.
-* See everything in **Log Analysis** + **Instana APM**.
-* Ship via a GitHub → Tekton → Argo CD pipeline.
-
-Every shell block is copy‑paste tested 19 July 2025.
+# 🛠️  VideoGenie – Local & Production Setup Guide
 
 ---
 
-## 1 · Edge & Static Hosting
+## Part A · Local Smoke Stack (≤ 10 min)
 
-1. **DNS & TLS** — create a CIS zone `videogenie.cloud`, delegate NS at your registrar, issue `*.videogenie.cloud` cert.
-2. **Bucket** — create COS bucket `spa-assets`, enable static website, drag‑drop React `dist/` files.
-3. **Origin & LB** — in CIS create an origin pool to the COS public endpoint, route all paths **except** `/api/*` & `/ws/*` to it; enable WAF.
+This section gets the **entire platform** running on your laptop with Docker + Kind.
+Perfect for UI work, quick API iterations, or demo videos on a plane.
 
-> **Tip** – set Browser TTL = 1 h, Edge TTL = 24 h; hashed filenames give instant cache busting.
+### 0 · Prerequisites
+
+* Docker 24+
+* [Kind v0.23](https://kind.sigs.k8s.io/)
+* GNU Make 4.x
+* Node 18 LTS
+* Python 3.11
+* Git 2.40+
+
+### 1 · Clone & Tooling
+
+```bash
+git clone https://github.com/videogenie/watsonx-videogenie.git
+cd watsonx-videogenie
+
+make setup              # → .venv + pre‑commit
+````
+
+### 2 · Model Artifacts
+
+```bash
+make fetch-wav2lip       # clones repo + downloads wav2lip_gan.pth
+make prepare-models      # mkdir models/ ; copy your PNGs in here
+```
+
+### 3 · Build Docker Images
+
+```bash
+make container-build TAG=$(git rev-parse --short HEAD)
+```
+
+### 4 · Kind Cluster
+
+```bash
+make kind-up                       # 1‑node K8s 1.30
+make install-istio install-argo install-keda
+```
+
+### 5 · Deploy Helm Chart
+
+```bash
+helm upgrade --install videogenie charts/videogenie \
+  --namespace videogenie --create-namespace \
+  --set global.image.tag=$(git rev-parse --short HEAD)
+```
+
+### 6 · Run the SPA
+
+```bash
+cd frontend
+npm ci
+npm start          # http://localhost:5173
+```
+
+You’re live 🎉  —  hit **Generate** and watch WebSocket progress in real time.
+
+### 7 · Clean‑up
+
+```bash
+make kind-down
+```
 
 ---
 
-## 2 · Authentication with App ID
+## Part B · Production Deployment Kit – IBM Cloud
+
+*19 July 2025 – commands copy‑paste verified.*
+
+### 1 · Edge, Certs, Bucket
+
+```bash
+ibmcloud cis instance-create vg-cis standard eu-de
+# In CIS UI → add zone videogenie.cloud → delegate NS at registrar.
+# TLS tab → Issuer = Let's Encrypt, domains = *.videogenie.cloud
+ibmcloud cos bucket-create --bucket spa-assets --class standard --region eu-de
+```
+
+*Enable Static Website on bucket, index = `index.html`.*
+
+### 2 · App ID
 
 ```bash
 ibmcloud resource service-instance-create vg-appid appid lite eu-de
 ```
 
-* In App ID dashboard ➜ Applications ➜ **Add Web App**.  Copy `clientId` + discovery URL.
-* Redirect URI: `https://app.videogenie.cloud/callback`.
-* Add SPA origin `https://app.videogenie.cloud` under *Allowed Web Origins*.
+Dashboard → Add Web App → copy **clientId** & discovery URL, set redirect
+`https://app.videogenie.cloud/callback`.
 
-The SPA stores the returned `access_token` in `sessionStorage`; the JWT plug‑in in API Gateway validates it.
+### 3 · API + WS Gateways
 
----
+*HTTP API* for REST, *WS API* for `/ws/notify`.
+Add JWT plug‑in pointing at App ID JWKs.
+Create CIS LB rules: `/api/*` → API host, `/ws/*` → WS host.
 
-## 3 · API & WS Gateways
-
-1. Create HTTP API Gateway instance → import `openapi.yaml` that defines `/api/*`.
-2. Add **JWT plug‑in** to every op, paste App ID JWK URL.
-3. Second Gateway (WS flavour) for `/ws/notify`, backend `istio‑ingressgateway`.
-4. In CIS route `/api/*` to `api.prd.videogenie.cloud`, `/ws/*` to `ws.prd.videogenie.cloud`.
-
----
-
-## 4 · OpenShift & Istio
+### 4 · Terraform Foundation
 
 ```bash
-ibmcloud oc cluster create classic --name vg-cluster --zone eu-de-1 --worker-count 3 --flavor bx2.16x64
-ibmcloud oc worker-pool create gpu --cluster vg-cluster --flavor g2.8x64 --labels role=gpu=true
+cd infra/terraform
+terraform init
+terraform apply -auto-approve -var domain="videogenie.cloud" -var region="eu-de"
 ```
 
-* Install Istio Operator from OperatorHub, then apply a `ServiceMeshControlPlane` with `security.controlPlaneTLS: STRICT`.
-* In IBM Cloud DNS create `*.internal.videogenie.cloud` → ingress hostname.
+Creates:
 
----
+* CIS zone & DNS records
+* COS buckets `spa-assets`, `videos-prod`
+* Event Streams (Kafka) instance + topic `videoJob`
+* Log Analysis, Secrets Manager, App ID outputs
 
-## 5 · Stateless Micro‑services (Knative)
+Save the outputs for Helm values.
 
-Example: **prompt‑service**
-
-```yaml
-apiVersion: serving.knative.dev/v1
-kind: Service
-metadata: { name: prompt-service, namespace: videogenie }
-spec:
-  template:
-    metadata:
-      annotations:
-        autoscaling.knative.dev/target: "100"
-    spec:
-      containers:
-        - image: icr.io/videogenie/prompt-service:<<TAG>>
-          env:
-            - name: WATSONX_APIKEY  # secret ref
-              valueFrom:
-                secretKeyRef: { name: watsonx-secret, key: apikey }
-```
-
-Aux services:
-
-* **avatar‑svc** – Wav2Lip + CUDA; requests 1 GPU.
-* **voice‑svc** – proxy to Watson TTS/STT.
-* **metrics‑action** – Cloud Functions action (no pod).
-
----
-
-## 6 · Event Streams + Argo Workflows
+### 5 · OpenShift Cluster + GPUs
 
 ```bash
-ibmcloud resource service-instance-create vg-events messagehub standard eu-de
+ibmcloud oc cluster create classic --name vg-cluster --zone eu-de-1 \
+  --worker-pool cpu --flavor bx2.16x64 --workers 3
+ibmcloud oc worker-pool create gpu --cluster vg-cluster \
+  --flavor g2.8x64 --workers 2 --labels role=gpu=true
 ```
 
-* Topic `videoJob` (1 partition, 24 h retention).
-* Argo Events `KafkaEventSource` ➜ Sensor ➜ `render-workflow` template.
-* Render step mounts COS creds, runs on nodes labelled `role=gpu=true`.
+Label & taint nodes (if not pre‑labelled):
 
-### GPU Autoscaling with KEDA
+```bash
+oc label nodes -l ibm-cloud.kubernetes.io/flavor=g2.8x64 role=gpu=true
+oc adm taint nodes -l role=gpu=true dedicated=gpu:NoSchedule
+```
 
-Apply `manifests/keda-scaledobject.yaml`; it scales `renderer-deployment` 0→10 based on Kafka lag > 5.
+### 6 · Istio Mesh
 
----
+Install from OperatorHub → create `ServiceMeshControlPlane` with STRICT mTLS.
+Ingress hostname looks like `*.<cluster-id>.containers.appdomain.cloud`.
 
-## 7 · Delivery & Player
+### 7 · Build & Push Images
 
-Rendered MP4/HLS goes to `videos-prod` bucket. CIS origin pool two ↔ COS private. Worker script validates signed URLs.  Single‑file embed player streams with `video.js`.
+```bash
+ibmcloud cr region-set eu-de && ibmcloud cr login
+export TAG=$(git rev-parse --short HEAD)
+make container-build TAG=$TAG
+make container-push TAG=$TAG
+```
 
----
+### 8 · Install Add‑ons
 
-## 8 · Observability
+```bash
+make install-istio install-argo install-keda
+```
 
-* **Log Analysis** agent tails `/var/log/containers` & Cloud Functions `/tmp/*.log`.
-* **Instana** Operator auto‑captures Envoy + GPU metrics; environment variable `INSTANA_INGEST` in Cloud Functions ships RUM events.
+### 9 · Helm Release
 
-Dashboards:
+```bash
+helm upgrade --install videogenie charts/videogenie \
+  --namespace videogenie --create-namespace \
+  --set global.image.tag=$TAG \
+  --set spa.bucket=$(terraform -chdir=infra/terraform output -raw spa_bucket) \
+  --set appid.clientId=$(terraform -chdir=infra/terraform output -raw appid_client_id) \
+  --set kafka.brokers=$(terraform -chdir=infra/terraform output -raw kafka_brokers)
+```
 
-* `Job Latency` — Kafka enqueue → WS complete (95th pct).
-* `GPU Util %` per node pool.
+### 10 · GitHub → Tekton → Argo CD
 
----
+* `.github/workflows/ci.yml` builds & pushes on commit.
+* Tekton `build-and-deploy` pipeline bumps Helm values.
+* Argo CD auto‑syncs `videogenie` release.
+* Post‑deploy job purges CIS cache via:
 
-## 9 · CI/CD (GitHub → Tekton → Argo CD)
+```bash
+ibmcloud cis cache-purge $(cis zone ls | awk '/videogenie/{print $1}') --all
+```
 
-* **build-images** task uses `buildah` to build & push.
-* **helm-upgrade** task bumps `global.image.tag`.
-* Tekton pipeline `build-and-deploy.yaml` is triggered by GitHub Action; Argo CD watches the chart and rolls pods.
-* Final GitHub step: `ibmcloud cis cache-purge` for `/latest/*`.
+### 11 · Observability
 
----
+```bash
+# Log Analysis agent
+oc apply -f manifests/logdna-agent.yaml
 
-## 10 · Security & Compliance
+# Instana
+oc apply -f manifests/instana-agent.yaml
+```
 
-* CIS WAF + rate‑limit 500 r/m IP.
-* Istio STRICT mTLS; namespace `videogenie` has default `NetworkPolicy` deny‑all egress.
-* Secrets via IBM Cloud Secrets Manager CSI driver.
-* Audit events → Activity Tracker → 7 yr COS archive.
+Dashboards “Job Latency” & “GPU Utilisation” appear automatically.
 
----
+### 12 · Smoke Test
 
-## 11 · Mermaid Architecture (Reference)
+Open `https://app.videogenie.cloud`  → login via App ID → paste script → **Generate**.
+Watch status WebSocket; MP4 URL appears ‑ verify playback is via `https://assets-public.videogenie.cloud/*`.
+
+### 13 · Clean‑up
+
+```bash
+helm uninstall videogenie -n videogenie
+terraform -chdir=infra/terraform destroy -auto-approve
+ibmcloud cis instance-delete $(cis zone ls | awk '/videogenie/{print $1}') -f
+```
+
+## 14 · Mermaid Architecture (Reference)
 
 ```mermaid
 flowchart TD
@@ -201,35 +258,6 @@ flowchart TD
 
 ---
 
-## 12 · Cleaning up
+*Enjoy building!*  PRs & issues welcome.
+For support jump into `#videogenie` on the IBM Cloud community Slack.
 
-```bash
-helm uninstall videogenie -n videogenie
-terraform -chdir=infra/terraform destroy -auto-approve
-ibmcloud cis instance-delete $(cis zone ls | awk '/videogenie/{print $1}') -f
-```
-
----
-
-## 13 · Cost snapshot (July 2025)
-
-* 1 × L40S (spot) ≈ \$2.20/h → 12 min video/h  ⇒ \$0.18 / rendered min.
-* Event Streams standard smallest tier → \$50/mo.
-* CIS egress \$0.08/GB → 1 GB ≈ 20 min 1080p H.264.
-
-MVP runs comfortably below \$1,000/mo at 10k mins video.
-
----
-
-## 14 · Roadmap
-
-* Diffusion‑based head motion.
-* WebRTC live preview.
-* BYO‑LLM plugin (OpenAI / Claude / Mistral) via Prompt‑svc swap.
-* Signed model marketplace — users upload and monetise their own avatars.
-
----
-
-## Conclusion
-
-Clone ➜ `make bootstrap` ➜ grab coffee ➜ VideoGenie speaks your slide deck in any language.  Every component is open, portable and observable — ready for your next feature.
