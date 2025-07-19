@@ -9,7 +9,7 @@
 # ----------------------------------------------------------------------#
 # Globals                                                               #
 # ----------------------------------------------------------------------#
-SERVICES        := avatar-service prompt-service orchestrate-service renderer
+SERVICES        := avatar-service prompt-service orchestrate-service   # renderer is top‑level
 CONTAINER_REG   ?= icr.io/videogenie
 TAG             ?= $(shell git rev-parse --short HEAD)
 PY              ?= python3.11
@@ -31,7 +31,7 @@ help:          ## Show this help
 	@echo "WatsonX‑VideoGenie developer Makefile"
 	@echo
 	$(call PRINT_TARGET,setup,Create Python venv + install core tooling)
-	$(call PRINT_TARGET,fetch-wav2lip,Clone/download Wav2Lip repo & model checkpoint)
+	$(call PRINT_TARGET,fetch-wav2lip,Clone/download Wav2Lip repo & checkpoint)
 	$(call PRINT_TARGET,prepare-models,Create /models directory for avatar PNGs)
 	$(call PRINT_TARGET,container-build,Build all Docker images with TAG=$(TAG))
 	$(call PRINT_TARGET,container-push,Push all images to $(CONTAINER_REG))
@@ -57,43 +57,50 @@ $(VENV_DIR)/bin/activate:
 # Wav2Lip & Models Prep                                                 #
 # ----------------------------------------------------------------------#
 .PHONY: fetch-wav2lip
-fetch-wav2lip: ## Clone Wav2Lip repo under avatar-service and download checkpoint
-	@echo "🔄 Cloning/updating Wav2Lip repository..."
+fetch-wav2lip: ## Clone Wav2Lip repo + download checkpoint
+	@echo "🔄 Cloning/updating Wav2Lip..."
 	@mkdir -p services/avatar-service/app/Wav2Lip
 	@if [ -d services/avatar-service/app/Wav2Lip/.git ]; then \
 	  cd services/avatar-service/app/Wav2Lip && git pull; \
 	else \
-	  git clone https://github.com/Rudrabha/Wav2Lip.git services/avatar-service/app/Wav2Lip; \
+	  git clone --depth 1 https://github.com/Rudrabha/Wav2Lip.git services/avatar-service/app/Wav2Lip; \
 	fi
-	@echo "📥 Downloading Wav2Lip checkpoint..."
+	@mkdir -p services/avatar-service/app/Wav2Lip/checkpoints
+	@echo "📥 Downloading checkpoint (only first run may take a while)..."
 	@wget -q -nc \
 	  https://github.com/Rudrabha/Wav2Lip/releases/download/v0.1/wav2lip_gan.pth \
 	  -O services/avatar-service/app/Wav2Lip/checkpoints/wav2lip_gan.pth
-	@echo "✅ Wav2Lip code and checkpoint in place."
+	@echo "✅ Wav2Lip ready."
 
 .PHONY: prepare-models
 prepare-models: ## Create /models directory for avatar PNGs
-	@echo "🔧 Creating models directory (mount here at runtime)..."
+	@echo "🔧 Preparing models directory..."
 	@mkdir -p models
-	@echo "✅ models/ directory ready; populate with <avatarId>.png files."
+	@echo "✅ models/ directory ready."
 
 # ----------------------------------------------------------------------#
 # Docker images                                                         #
 # ----------------------------------------------------------------------#
-.PHONY: container-build build-all
-container-build build-all: ## Build all service images
+.PHONY: container-build
+container-build: ## Build all Docker images
 	@for svc in $(SERVICES); do \
 		echo "🔨 Building $$svc"; \
 		docker build -t $(CONTAINER_REG)/$$svc:$(TAG) services/$$svc ; \
 	done
-	@echo "✅ All images built with tag $(TAG)"
+	# build renderer image (top‑level)
+	echo "🔨 Building renderer"; \
+	docker build -t $(CONTAINER_REG)/renderer:$(TAG) renderer
+	@echo "✅ Images built with tag $(TAG)"
 
-.PHONY: container-push push-all
-container-push push-all: ## Push all images to registry
+.PHONY: container-push
+container-push: ## Push all images to registry
 	@for svc in $(SERVICES); do \
 		echo "📤 Pushing $$svc"; \
 		docker push $(CONTAINER_REG)/$$svc:$(TAG) ; \
 	done
+	# push renderer
+	echo "📤 Pushing renderer"; \
+	docker push $(CONTAINER_REG)/renderer:$(TAG)
 	@echo "✅ All images pushed"
 
 # ----------------------------------------------------------------------#
@@ -101,24 +108,24 @@ container-push push-all: ## Push all images to registry
 # ----------------------------------------------------------------------#
 .PHONY: install-istio
 install-istio: ## Install Istio via Helm
-	@echo "🚀 Installing Istio via Helm"
+	@echo "🚀 Installing Istio"
 	helm repo add istio https://istio-release.storage.googleapis.com/charts
-	helm upgrade --install istio-base istio/base -n istio-system --create-namespace
-	helm upgrade --install istiod istio/istiod -n istio-system
-	helm upgrade --install istio-ingress istio/gateway -n istio-system
+	helm upgrade --install istio-base istio/base   -n istio-system --create-namespace
+	helm upgrade --install istiod     istio/istiod -n istio-system
+	helm upgrade --install istio-gw   istio/gateway -n istio-system
 	@echo "✅ Istio installed"
 
 .PHONY: install-argo
 install-argo: ## Install Argo Workflows & Events via Helm
-	@echo "🚀 Installing Argo Workflows & Events"
+	@echo "🚀 Installing Argo"
 	helm repo add argo https://argoproj.github.io/argo-helm
-	helm upgrade --install argo argo/argo-workflows -n argo --create-namespace
-	helm upgrade --install argo-events argo/argo-events -n argo-events --create-namespace
+	helm upgrade --install argo         argo/argo-workflows -n argo --create-namespace
+	helm upgrade --install argo-events  argo/argo-events     -n argo-events --create-namespace
 	@echo "✅ Argo installed"
 
 .PHONY: install-keda
 install-keda: ## Install KEDA autoscaler via Helm
-	@echo "🚀 Installing KEDA autoscaler"
+	@echo "🚀 Installing KEDA"
 	helm repo add kedacore https://kedacore.github.io/charts
 	helm upgrade --install keda kedacore/keda -n keda --create-namespace
 	@echo "✅ KEDA installed"
@@ -127,7 +134,7 @@ install-keda: ## Install KEDA autoscaler via Helm
 # Kind mini‑cluster (CPU‑only smoke)                                    #
 # ----------------------------------------------------------------------#
 .PHONY: kind-up
-kind-up: ## Spin Kind cluster with Istio + Knative for local smoke tests
+kind-up: ## Spin Kind cluster (includes Istio, Knative etc.)
 	@echo "🚀 Creating Kind cluster"
 	kind create cluster --name videogenie --image kindest/node:v1.30.0
 	kubectl wait --for=condition=Ready node --all --timeout=120s
