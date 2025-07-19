@@ -98,6 +98,8 @@ flowchart TD
 ```
 ---
 
+---
+
 ## ⚡ Quick start (local ≤ 10 min)
 
 ```bash
@@ -129,6 +131,16 @@ flowchart TD
 
 # 8 – (Optional) local KIND smoke cluster (CPU‑only renderer)
  make kind-up && cd frontend && npm ci && npm start
+
+# 9: Run the Frontend Development Server
+# With the backend services running in KIND, you can now start the frontend.
+cd frontend
+npm ci
+npm start
+
+echo "✅ Local development environment is up and running!"
+echo "🚀 Frontend should be available at http://localhost:5173"
+
 ```
 
 For a **production IBM Cloud** deployment follow the step‑by‑step sections below.
