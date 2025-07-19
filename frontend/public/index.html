@@ -1,19 +1,81 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="h-full scroll-smooth">
   <head>
+    <!-- ────────── Meta & SEO ────────── -->
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="VideoGenie turns plain text into AI‑generated avatar videos. Built with IBM Cloud, watsonx .ai and OpenShift GPU compute."
+    />
+    <meta name="theme-color" content="#0f62fe" />
     <link rel="icon" href="/favicon.svg" />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <title>VideoGenie</title>
-    <script>
-      if (import.meta.env.VITE_ENABLE_ANALYTICS === 'true') {
-        const s=document.createElement('script');s.src="/vendors/hotjar.js";document.head.appendChild(s);
-      }
-    </script>
+
+    <!-- Social preview -->
+    <meta property="og:title" content="VideoGenie — AI Avatar Video Creator" />
+    <meta
+      property="og:description"
+      content="Instantly create narrated videos from any script. Powered by IBM Cloud."
+    />
+    <meta property="og:image" content="/social-preview.png" />
+    <meta property="og:type" content="website" />
+
+    <title>VideoGenie · AI Avatar Video Creator</title>
+
+    <!-- Tailwind “base components utilities” will be injected at build time -->
   </head>
-  <body class="bg-slate-50">
-    <div id="root"></div>
+
+  <body class="min-h-full bg-slate-50 text-slate-800 antialiased">
+    <!-- Loading shell → swapped out by React within ~50 ms in dev / ~10 ms in prod -->
+    <div
+      id="root"
+      class="grid h-screen place-items-center text-center px-6"
+      style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;"
+    >
+      <div>
+        <svg
+          class="mx-auto mb-4 animate-spin text-blue-600"
+          style="width: 48px; height: 48px"
+          viewBox="0 0 24 24"
+          fill="none"
+        >
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="4"
+            stroke-linecap="round"
+            stroke-dasharray="60"
+            stroke-dashoffset="30"
+          />
+        </svg>
+        <p class="text-lg font-medium">VideoGenie is loading…</p>
+      </div>
+    </div>
+
+    <!-- React / Vite entrypoint -->
     <script type="module" src="/src/main.tsx"></script>
+
+    <noscript>
+      <style>
+        #root {
+          display: none;
+        }
+      </style>
+      <div
+        class="fixed inset-0 grid place-items-center bg-white p-6 text-center"
+        style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;"
+      >
+        <h1 style="font-size: 1.5rem; margin-bottom: 0.5rem">
+          JavaScript required
+        </h1>
+        <p style="max-width: 26rem">
+          VideoGenie’s interface is built with React and needs JavaScript
+          enabled. Please activate JavaScript in your browser settings and
+          refresh.
+        </p>
+      </div>
+    </noscript>
   </body>
 </html>
