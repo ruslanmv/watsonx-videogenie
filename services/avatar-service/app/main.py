@@ -1,9 +1,11 @@
+# services/avatar-service/app/main.py
+
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from uuid import uuid4
 from pathlib import Path
 import tempfile, os, json
-from render import wav2lip_render, download_voice
+from app.render import wav2lip_render, download_voice
 
 app = FastAPI(title="avatar‑svc", version="0.1.0")
 

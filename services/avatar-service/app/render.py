@@ -1,3 +1,5 @@
+# services/avatar-service/app/render.py
+
 """Thin wrappers around Wav2Lip CLI utilities."""
 import subprocess, tempfile, requests, shutil, os
 
@@ -6,7 +8,6 @@ WAV2LIP_SCRIPT = "Wav2Lip/inference.py"
 MODELS_DIR = "/models"
 
 def download_voice(url: str) -> str:
-    """Download voice clip to a temp WAV file and return path."""
     fd, path = tempfile.mkstemp(suffix=".wav")
     with requests.get(url, stream=True, timeout=30) as r:
         r.raise_for_status()
