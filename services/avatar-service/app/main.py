@@ -15,7 +15,7 @@ from typing import Dict, List
 from uuid import uuid4
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, status
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.render import download_voice, wav2lip_render
@@ -87,13 +87,13 @@ async def health_check() -> Dict[str, str]:
 
 
 @app.get("/avatars", response_model=List[str])
-async def list_avatars() -> JSONResponse:
+async def list_avatars() -> List[str]:
     """List all available avatar images.
 
     Scans the avatar directory for PNG files and returns their identifiers.
 
     Returns:
-        JSONResponse: List of avatar identifiers (filenames without extensions).
+        List[str]: List of avatar identifiers (filenames without extensions).
 
     Raises:
         HTTPException: If avatar directory doesn't exist or is inaccessible.
@@ -108,7 +108,7 @@ async def list_avatars() -> JSONResponse:
 
         avatars = [p.stem for p in AVATAR_DIR.glob("*.png")]
         logger.info(f"Found {len(avatars)} avatars")
-        return JSONResponse(content=avatars)
+        return avatars
 
     except Exception as e:
         logger.error(f"Error listing avatars: {e}")
@@ -182,7 +182,7 @@ async def render(task: RenderTaskRequest, bg: BackgroundTasks) -> Dict[str, str]
         )
 
 
-@app.get("/status/{job_id}")
+@app.get("/status/{job_id}", response_model=None)
 async def get_job_status(job_id: str) -> FileResponse | Dict[str, str]:
     """Check rendering job status and retrieve completed video.
 
